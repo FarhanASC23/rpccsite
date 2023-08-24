@@ -1,0 +1,311 @@
+(function() {
+    'use strict';
+
+    $(initNavbarSearch);
+
+    function initNavbarSearch() {
+
+        var navSearch = new navbarSearchInput();
+
+        // Open search input
+        var $searchOpen = $('[data-search-open]');
+
+        $searchOpen
+            .on('click', function(e) { e.stopPropagation(); })
+            .on('click', navSearch.toggle);
+
+        // Close search input
+        var $searchDismiss = $('[data-search-dismiss]');
+        var inputSelector = '.navbar-form input[type="text"]';
+
+        $(inputSelector)
+            .on('click', function(e) { e.stopPropagation(); })
+            .on('keyup', function(e) {
+                if (e.keyCode == 27) // ESC
+                    navSearch.dismiss();
+            });
+
+        // click anywhere closes the search
+        $(document).on('click', navSearch.dismiss);
+        // dismissable options
+        $searchDismiss
+            .on('click', function(e) { e.stopPropagation(); })
+            .on('click', navSearch.dismiss);
+
+    }
+
+    var navbarSearchInput = function() {
+        var navbarFormSelector = 'form.navbar-form';
+        return {
+            toggle: function() {
+
+                var navbarForm = $(navbarFormSelector);
+
+                navbarForm.toggleClass('open');
+
+                var isOpen = navbarForm.hasClass('open');
+
+                navbarForm.find('input')[isOpen ? 'focus' : 'blur']();
+
+            },
+
+            dismiss: function() {
+                $(navbarFormSelector)
+                    .removeClass('open') // Close control
+                    .find('input[type="text"]').blur() // remove focus
+                // .val('')                    // Empty input
+                ;
+            }
+        };
+
+    }
+
+    
+})();
+
+/**
+ * Notify Addon definition as jQuery plugin
+ * Adapted version to work with Bootstrap classes
+ * More information http://getuikit.com/docs/addons_notify.html
+ */
+
+(function() {
+
+    var containers = {},
+        messages = {},
+
+        notify = function(options) {
+
+            if ($.type(options) == 'string') {
+                options = { message: options };
+            }
+
+            if (arguments[1]) {
+                options = $.extend(options, $.type(arguments[1]) == 'string' ? { status: arguments[1] } : arguments[1]);
+            }
+
+            return (new Message(options)).show();
+        },
+        closeAll = function(group, instantly) {
+            if (group) {
+                for (var id in messages) { if (group === messages[id].group) messages[id].close(instantly); }
+            } else {
+                for (var id in messages) { messages[id].close(instantly); }
+            }
+        };
+
+    var Message = function(options) {
+
+        var $this = this;
+
+        this.options = $.extend({}, Message.defaults, options);
+
+        this.uuid = "ID" + (new Date().getTime()) + "RAND" + (Math.ceil(Math.random() * 100000));
+        this.element = $([
+            // alert-dismissable enables bs close icon
+            '<div class="uk-notify-message alert-dismissable">',
+            '<a class="close">&times;</a>',
+            '<div>' + this.options.message + '</div>',
+            '</div>'
+
+        ].join('')).data("notifyMessage", this);
+
+        // status
+        if (this.options.status) {
+            this.element.addClass('alert alert-' + this.options.status);
+            this.currentstatus = this.options.status;
+        }
+
+        this.group = this.options.group;
+
+        messages[this.uuid] = this;
+
+        if (!containers[this.options.pos]) {
+            containers[this.options.pos] = $('<div class="uk-notify uk-notify-' + this.options.pos + '"></div>').appendTo('body').on("click", ".uk-notify-message", function() {
+                $(this).data("notifyMessage").close();
+            });
+        }
+    };
+
+
+    $.extend(Message.prototype, {
+
+        uuid: false,
+        element: false,
+        timout: false,
+        currentstatus: "",
+        group: false,
+
+        show: function() {
+
+            if (this.element.is(":visible")) return;
+
+            var $this = this;
+
+            containers[this.options.pos].show().prepend(this.element);
+
+            var marginbottom = parseInt(this.element.css("margin-bottom"), 10);
+
+            this.element.css({ "opacity": 0, "margin-top": -1 * this.element.outerHeight(), "margin-bottom": 0 }).animate({ "opacity": 1, "margin-top": 0, "margin-bottom": marginbottom }, function() {
+
+                if ($this.options.timeout) {
+
+                    var closefn = function() { $this.close(); };
+
+                    $this.timeout = setTimeout(closefn, $this.options.timeout);
+
+                    $this.element.hover(
+                        function() { clearTimeout($this.timeout); },
+                        function() { $this.timeout = setTimeout(closefn, $this.options.timeout); }
+                    );
+                }
+
+            });
+
+            return this;
+        },
+
+        close: function(instantly) {
+
+            var $this = this,
+                finalize = function() {
+                    $this.element.remove();
+
+                    if (!containers[$this.options.pos].children().length) {
+                        containers[$this.options.pos].hide();
+                    }
+
+                    delete messages[$this.uuid];
+                };
+
+            if (this.timeout) clearTimeout(this.timeout);
+
+            if (instantly) {
+                finalize();
+            } else {
+                this.element.animate({ "opacity": 0, "margin-top": -1 * this.element.outerHeight(), "margin-bottom": 0 }, function() {
+                    finalize();
+                });
+            }
+        },
+
+        content: function(html) {
+
+            var container = this.element.find(">div");
+
+            if (!html) {
+                return container.html();
+            }
+
+            container.html(html);
+
+            return this;
+        },
+
+        status: function(status) {
+
+            if (!status) {
+                return this.currentstatus;
+            }
+
+            this.element.removeClass('alert alert-' + this.currentstatus).addClass('alert alert-' + status);
+
+            this.currentstatus = status;
+
+            return this;
+        }
+    });
+
+    Message.defaults = {
+        message: "",
+        status: "normal",
+        timeout: 5000,
+        group: null,
+        pos: 'top-center'
+    };
+
+
+    $["notify"] = notify;
+    $["notify"].message = Message;
+    $["notify"].closeAll = closeAll;
+
+    return notify;
+
+}());
+
+function showMessage(notiMessage="" , notiType="success", notiPosition="top-center")
+{
+    $.notify(notiMessage,{"status":notiType, "pos":notiPosition});
+}
+
+function copyToClipboard (btnID,str){
+  const el = document.createElement('textarea');  // Create a <textarea> element
+  el.value = str;                                 // Set its value to the string that you want copied
+  el.setAttribute('readonly', '');                // Make it readonly to be tamper-proof
+  el.style.position = 'absolute';                 
+  el.style.left = '-9999px';                      // Move outside the screen to make it invisible
+  document.body.appendChild(el);                  // Append the <textarea> element to the HTML document
+  const selected =            
+    document.getSelection().rangeCount > 0        // Check if there is any content selected previously
+      ? document.getSelection().getRangeAt(0)     // Store selection if found
+      : false;                                    // Mark as false to know no selection existed before
+  el.select();                                    // Select the <textarea> content
+  document.execCommand('copy');                   // Copy - only works as a result of a user action (e.g. click events)
+  document.body.removeChild(el);                  // Remove the <textarea> element
+  if (selected) {                                 // If a selection existed before copying
+    document.getSelection().removeAllRanges();    // Unselect everything on the HTML document
+    document.getSelection().addRange(selected);   // Restore the original selection
+  }
+  $("#"+btnID).html("Copied");
+}
+
+function resetCopiedText(btnID, btnText = ""){
+  if( typeof btnText != "undefined" && btnText != "" )
+    $("#"+btnID).html(btnText);
+  else
+    $("#"+btnID).html("Copy Link");
+}
+
+function isNumber(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+String.prototype.capitalize = function() {
+  return this.charAt(0).toUpperCase() + this.slice(1);
+}
+
+String.prototype.isEmpty = function() {
+  return (this.length === 0 || !this.trim());
+};
+
+function nospaces(t){
+  if(t.value.match(/\s/g)){
+    t.value=t.value.replace(/\s/g,'');
+  }
+}
+
+function isEmail(email) {
+  var regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+  return regex.test(email);
+}
+
+function nl2br (str, is_xhtml) {   
+    var breakTag = (is_xhtml || typeof is_xhtml === 'undefined') ? '<br />' : '<br>';    
+    return (str + '').replace(/([^>\r\n]?)(\r\n|\n\r|\r|\n)/g, '$1'+ breakTag +'$2');
+}
+
+function isDefinedBlank(variable_value)
+{
+  if( typeof variable_value != "undefined" )
+    return variable_value;
+  else
+    return "";
+}
+
+function isDefinedDash(variable_value)
+{
+  if( typeof variable_value != "undefined" )
+    return variable_value;
+  else
+    return "-";
+}
